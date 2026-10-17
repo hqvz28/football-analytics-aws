@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enterprise Football Analytics Lakehouse on AWS — Architectural Walkthrough</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  
+  <!-- Reveal.js CSS from CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(18, 26, 43, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-gold: #f6d365;
+      --accent-green: #10b981;
+      --accent-purple: #8b5cf6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    body, .reveal {
+      background-color: var(--bg-color) !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      color: var(--text-main) !important;
+    }
+
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 700 !important;
+      text-transform: none !important;
+      letter-spacing: -0.02em;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .gold-gradient {
+      background: linear-gradient(135deg, var(--accent-gold) 0%, #fda085 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      text-align: left;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      margin-bottom: 12px;
+      background: rgba(0, 242, 254, 0.12);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+    }
+
+    .badge-gold {
+      background: rgba(246, 211, 101, 0.12);
+      color: var(--accent-gold);
+      border: 1px solid rgba(246, 211, 101, 0.3);
+    }
+
+    .badge-purple {
+      background: rgba(139, 92, 246, 0.12);
+      color: var(--accent-purple);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .stat-number {
+      font-size: 38px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    pre code {
+      font-family: 'JetBrains Mono', monospace !important;
+      font-size: 13px !important;
+      border-radius: 10px !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    .arch-container {
+      background: #080c14;
+      border: 1px solid rgba(0, 242, 254, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      text-align: left;
+      line-height: 1.45;
+      overflow-x: auto;
+    }
+
+    ul.clean-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 10px 0;
+    }
+
+    ul.clean-list li {
+      position: relative;
+      padding-left: 24px;
+      margin-bottom: 12px;
+      font-size: 16px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    ul.clean-list li::before {
+      content: "▹";
+      position: absolute;
+      left: 0;
+      color: var(--accent-cyan);
+      font-weight: bold;
+    }
+
+    .nav-hint {
+      position: fixed;
+      bottom: 16px;
+      left: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.3);
+      z-index: 999;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- SLIDE 1: COVER -->
+      <section>
+        <div style="text-align: center;">
+          <div class="badge">AWS CLOUD & BIG DATA ARCHITECTURE</div>
+          <h1 style="font-size: 46px; margin: 16px 0;" class="gradient-text">
+            Enterprise Serverless Football Analytics Lakehouse
+          </h1>
+          <p style="font-size: 20px; color: var(--text-muted); max-width: 800px; margin: 0 auto 32px;">
+            End-to-End Cloud Platform for Ingestion, Distributed PySpark ETL, Machine Learning & Interactive Analytics
+          </p>
+          
+          <div class="card" style="display: inline-block; padding: 14px 28px; text-align: center;">
+            <div style="font-size: 16px; font-weight: 600; color: #fff;">Author: Hoang Quoc Viet</div>
+            <div style="font-size: 13px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+              Lead Data Engineer | GitHub: @hqvz28
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 2: AGENDA -->
+      <section>
+        <div class="badge">SYSTEM BLUEPRINT</div>
+        <h2 style="font-size: 34px; margin-bottom: 28px;">Architecture Agenda</h2>
+        <div class="grid-3">
+          <div class="card">
+            <div class="badge-gold badge">PHASE 1</div>
+            <h3 style="font-size: 18px; color: #fff;">1. Infrastructure & Ingestion</h3>
+            <ul class="clean-list">
+              <li>Terraform Cloud IaC</li>
+              <li>S3 Medallion Lakehouse</li>
+              <li>Python & Boto3 Ingestion</li>
+              <li>Automated Failover Handling</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="badge badge-purple">PHASE 2</div>
+            <h3 style="font-size: 18px; color: #fff;">2. ETL & Machine Learning</h3>
+            <ul class="clean-list">
+              <li>AWS Glue 4.0 PySpark</li>
+              <li>Partitioned Parquet Snappy</li>
+              <li>Automated Quality Gatekeeper</li>
+              <li>Spark MLlib Outcome Predictor</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="badge">PHASE 3</div>
+            <h3 style="font-size: 18px; color: #fff;">3. Analytics & CI/CD</h3>
+            <ul class="clean-list">
+              <li>Amazon Athena Presto SQL</li>
+              <li>Tactical KPIs & Standings</li>
+              <li>QuickSight BI Dashboards</li>
+              <li>GitHub Actions CI/CD</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 3: MEDALLION ARCHITECTURE -->
+      <section>
+        <div class="badge">HIGH-LEVEL DESIGN</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">AWS Medallion Lakehouse Architecture</h2>
+        <div class="arch-container">
+[Terraform IaC] ──► Provisions S3 Buckets, IAM Roles, Glue Job & Athena Workgroup
+      │
+[Football REST API] ──► [Python Ingestion (Boto3)] ──► [S3 Raw Zone (Bronze Lake)]
+                                                              │
+                                                              ▼
+                                                   [AWS Glue 4.0 (PySpark ETL)]
+                                                              │
+                                      +-----------------------+-----------------------+
+                                      │                                               │
+                                      ▼ (Partitioned by Season & League)              ▼
+               [S3 Processed Zone: Parquet (Gold Lake)]                  [Spark MLlib Match Predictor]
+                                      │                                               │
+                                      ▼ (Glue Data Catalog)                           ▼
+                        [Amazon Athena (Serverless SQL)] ──► [QuickSight]    [Predictions & Power Rankings]
+        </div>
+        <div class="grid-3" style="margin-top: 16px;">
+          <div class="card" style="padding: 14px;">
+            <div class="stat-number gold-gradient">Bronze</div>
+            <div class="stat-label">S3 Raw JSON / Glacier Lifecycle</div>
+          </div>
+          <div class="card" style="padding: 14px;">
+            <div class="stat-number gradient-text">Silver</div>
+            <div class="stat-label">Deduplicated & Cleaned Schema</div>
+          </div>
+          <div class="card" style="padding: 14px;">
+            <div class="stat-number" style="color: var(--accent-green);">Gold</div>
+            <div class="stat-label">Aggregated KPIs & Parquet Partitions</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 4: TERRAFORM IAC -->
+      <section>
+        <div class="badge-gold badge">INFRASTRUCTURE AS CODE</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Automated Cloud Provisioning (Terraform)</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="font-size: 18px; color: #fff; margin-bottom: 12px;">Automated Resources:</h3>
+            <ul class="clean-list">
+              <li><strong>S3 Data Lake</strong>: Raw, Staging & Processed buckets with AES256 SSE encryption.</li>
+              <li><strong>S3 Lifecycle Policies</strong>: Transitions Raw zone objects to Glacier after 90 days.</li>
+              <li><strong>Security Compliance</strong>: Enforces Public Access Block across all lakehouse buckets.</li>
+              <li><strong>IAM Least-Privilege</strong>: Dedicated execution role for Glue ETL.</li>
+              <li><strong>Athena Workgroup</strong>: Query isolation and encrypted results output.</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-hcl"># Terraform: S3 Lifecycle & Glue Job
+resource "aws_s3_bucket_lifecycle_configuration" "raw" {
+  bucket = aws_s3_bucket.raw.id
+  rule {
+    id     = "archive-raw-to-glacier"
+    status = "Enabled"
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+  }
+}
+
+resource "aws_glue_job" "football_etl" {
+  name         = "glue-transform-football-match-stats"
+  glue_version = "4.0"
+  worker_type  = "G.1X"
+  number_of_workers = 4
+  command {
+    script_location = "s3://.../transform_match_stats.py"
+  }
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5: DISTRIBUTED INGESTION -->
+      <section>
+        <div class="badge">DATA INGESTION</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Resilient Ingestion Engine (Python + Boto3)</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="font-size: 18px; color: #fff; margin-bottom: 12px;">Key Engineering Features:</h3>
+            <ul class="clean-list">
+              <li><strong>Exponential Backoff</strong>: Automated 429 rate limit detection and polite sleep retries.</li>
+              <li><strong>Structured Logging</strong>: Timestamped audit trails for all data transfers.</li>
+              <li><strong>Partitioned S3 Keys</strong>:
+                <code>s3://raw/matches/raw/league={code}/season={year}/</code>
+              </li>
+              <li><strong>Metadata Tagging</strong>: Checksum, source API ID, and ingestion timestamp headers.</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-python"># Ingestion with retry & partition streaming
+def upload_to_s3(self, data, league_id, season):
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    s3_key = f"{self.prefix}/league={league_id}/season={season}/matches_{timestamp}.json"
+    
+    self.s3_client.put_object(
+        Bucket=self.raw_bucket,
+        Key=s3_key,
+        Body=json.dumps(data).encode("utf-8"),
+        ContentType="application/json",
+        Metadata={
+            "league": league_id,
+            "season": season,
+            "source": "football_data_api"
+        }
+    )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 6: PYSPARK TRANSFORMATION -->
+      <section>
+        <div class="badge-purple badge">DISTRIBUTED ETL</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">AWS Glue 4.0 PySpark Transformation</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="font-size: 18px; color: #fff; margin-bottom: 12px;">Core Data Transformations:</h3>
+            <ul class="clean-list">
+              <li><strong>JSON Array Explode</strong>: Normalizes complex nested structures (competition, teams, scores).</li>
+              <li><strong>Window Deduplication</strong>: <code>row_number() over (partitionBy match_id orderBy utcDate desc)</code> guarantees single source of truth.</li>
+              <li><strong>Derived Feature Engineering</strong>:
+                Shot conversion rates, outcome categories (HOME_WIN, AWAY_WIN, DRAW), Over/Under 2.5 goals.
+              </li>
+              <li><strong>Columnar Snappy Parquet</strong>: Partitioned by <code>season</code> and <code>league</code>.</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-python"># PySpark: KPI Calculations & Partitioning
+enriched_df = deduped_df.withColumn(
+    "match_outcome",
+    F.when(F.col("home_score") > F.col("away_score"), "HOME_WIN")
+     .when(F.col("home_score") < F.col("away_score"), "AWAY_WIN")
+     .otherwise("DRAW")
+).withColumn(
+    "is_over_2_5_goals",
+    F.when((F.col("home_score") + F.col("away_score")) > 2.5, 1).otherwise(0)
+)
+
+enriched_df.write \
+    .mode("overwrite") \
+    .partitionBy("season", "league") \
+    .option("compression", "snappy") \
+    .parquet(s3_processed_path)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 7: DATA QUALITY -->
+      <section>
+        <div class="badge">QUALITY ASSURANCE</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Automated Data Quality Gatekeeper</h2>
+        <div class="grid-3">
+          <div class="card">
+            <div class="badge" style="color: var(--accent-green); border-color: var(--accent-green);">RULE 1</div>
+            <h3 style="font-size: 16px; color: #fff;">Primary Key Integrity</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">
+              Enforces <strong>0 NULLs</strong> and <strong>100% Uniqueness</strong> on <code>match_id</code>. Pipeline halts if duplicates exist.
+            </p>
+          </div>
+          <div class="card">
+            <div class="badge" style="color: var(--accent-cyan); border-color: var(--accent-cyan);">RULE 2</div>
+            <h3 style="font-size: 16px; color: #fff;">Domain Validity</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">
+              Verifies categorical values strictly match:
+              <code>HOME_WIN</code>, <code>AWAY_WIN</code>, or <code>DRAW</code>.
+            </p>
+          </div>
+          <div class="card">
+            <div class="badge" style="color: var(--accent-gold); border-color: var(--accent-gold);">RULE 3</div>
+            <h3 style="font-size: 16px; color: #fff;">Range Constraints</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">
+              Validates that scores $\ge 0$ and possession percentages satisfy:
+              <code>0.0 <= pct <= 100.0</code>.
+            </p>
+          </div>
+        </div>
+        <div class="card" style="margin-top: 20px; text-align: center; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3);">
+          <span style="color: var(--accent-green); font-weight: 600; font-size: 16px;">
+            ✓ Pre-flight Quality Audit ensures 0 corrupted records ever reach Amazon Athena or downstream BI tools.
+          </span>
+        </div>
+      </section>
+
+      <!-- SLIDE 8: MACHINE LEARNING (SPARK MLLIB) -->
+      <section>
+        <div class="badge-gold badge">PREDICTIVE ANALYTICS</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Spark MLlib: Match Outcome Prediction</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="font-size: 18px; color: #fff; margin-bottom: 12px;">Machine Learning Pipeline:</h3>
+            <ul class="clean-list">
+              <li><strong>Feature Assembly</strong>: Combines shot differential, conversion efficiency, possession dominance, and disciplinary indices.</li>
+              <li><strong>Standard Scaling</strong>: Normalizes multi-dimensional tactical metrics.</li>
+              <li><strong>Random Forest Classification</strong>: 50 distributed decision trees with max depth of 6.</li>
+              <li><strong>Output</strong>: Probability distribution across win/draw/loss & team power ranking tables.</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-python"># Spark MLlib: Training Random Forest Model
+assembler = VectorAssembler(
+    inputCols=["shot_diff", "on_target_diff", "possession_diff", "conv_diff"],
+    outputCol="unscaled_features"
+)
+scaler = StandardScaler(inputCol="unscaled_features", outputCol="features")
+rf = RandomForestClassifier(labelCol="label", featuresCol="features", numTrees=50)
+
+pipeline = Pipeline(stages=[assembler, scaler, rf])
+model = pipeline.fit(train_data)
+predictions = model.transform(test_data)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 9: ATHENA SERVERLESS SQL -->
+      <section>
+        <div class="badge">ANALYTICS ENGINE</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Amazon Athena Serverless SQL & Views</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="font-size: 18px; color: #fff; margin-bottom: 12px;">Optimized Analytical Views:</h3>
+            <ul class="clean-list">
+              <li><strong>Normalized View</strong>: <code>v_team_match_performance</code> unpivots home & away into team-centric records.</li>
+              <li><strong>Partition Pruning</strong>: Queries filter on <code>season</code> and <code>league</code>, cutting scan costs by 80-90%.</li>
+              <li><strong>Rolling Momentum</strong>: SQL Window functions:
+                <code>AVG(points) OVER (ROWS BETWEEN 4 PRECEDING AND CURRENT ROW)</code>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-sql">-- League Table Standings Query
+SELECT
+    season, league, team_name,
+    COUNT(match_id) AS matches_played,
+    COUNT(CASE WHEN result = 'W' THEN 1 END) AS wins,
+    SUM(goals_for) - SUM(goals_against) AS goal_diff,
+    SUM(points) AS total_points,
+    ROUND(AVG(possession_pct), 1) AS avg_possession,
+    DENSE_RANK() OVER (
+        PARTITION BY season, league 
+        ORDER BY SUM(points) DESC, (SUM(goals_for) - SUM(goals_against)) DESC
+    ) AS league_rank
+FROM football_analytics_db.v_team_match_performance
+GROUP BY season, league, team_name;</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 10: TACTICAL KPI & DASHBOARD -->
+      <section>
+        <div class="badge">BI & VISUAL STORYTELLING</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Amazon QuickSight BI Insights</h2>
+        <div class="grid-3">
+          <div class="card">
+            <h3 style="font-size: 16px; color: var(--accent-cyan); margin-bottom: 8px;">Venue Dominance</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">
+              Quantifies home vs. away goal differentials and win probabilities across Premier League & European competitions.
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="font-size: 16px; color: var(--accent-gold); margin-bottom: 8px;">Finishing Clinicality</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">
+              Shot conversion efficiency (Goals / Total Shots) revealing over-performing and under-performing attacks.
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="font-size: 16px; color: var(--accent-purple); margin-bottom: 8px;">5-Match Momentum</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">
+              Moving averages tracking team resilience, form progression, and comeback recovery rates.
+            </p>
+          </div>
+        </div>
+        <div class="card" style="margin-top: 20px; text-align: center;">
+          <div style="font-size: 15px; color: #fff;">
+            📊 Live Interactive Dashboards connect directly to Amazon Athena via Glue Catalog metadata.
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 11: CI/CD -->
+      <section>
+        <div class="badge">DEVOPS & AUTOMATION</div>
+        <h2 style="font-size: 32px; margin-bottom: 20px;">Continuous Integration & Deployment (CI/CD)</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="font-size: 18px; color: #fff; margin-bottom: 12px;">GitHub Actions Pipeline:</h3>
+            <ul class="clean-list">
+              <li><strong>Python Quality Audit</strong>: <code>flake8</code> checks for syntax and PEP 8 conformity.</li>
+              <li><strong>Automated Testing</strong>: <code>pytest</code> executes ingestion unit tests and PySpark logic mocks.</li>
+              <li><strong>Terraform Validation</strong>: <code>terraform fmt -check</code> and <code>terraform validate</code> run on every Pull Request.</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-yaml"># .github/workflows/ci-cd.yml
+name: CI/CD Pipeline - Football Analytics AWS
+on: [push, pull_request]
+
+jobs:
+  code-quality-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10" }
+      - run: |
+          pip install flake8 pytest
+          pytest tests/ -v
+
+  terraform-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hashicorp/setup-terraform@v3
+      - run: |
+          cd terraform
+          terraform fmt -check
+          terraform validate</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 12: CONCLUSION -->
+      <section>
+        <div style="text-align: center;">
+          <div class="badge-gold badge">ENGINEERING EXCELLENCE</div>
+          <h2 style="font-size: 38px; margin-bottom: 24px;" class="gradient-text">
+            Enterprise Impact & Deliverables
+          </h2>
+          
+          <div class="grid-3" style="margin-bottom: 32px;">
+            <div class="card" style="text-align: center;">
+              <div class="stat-number gradient-text">&lt; 1s</div>
+              <div class="stat-label">Athena Query Latency</div>
+            </div>
+            <div class="card" style="text-align: center;">
+              <div class="stat-number gold-gradient">~80%</div>
+              <div class="stat-label">Storage & Scan Savings</div>
+            </div>
+            <div class="card" style="text-align: center;">
+              <div class="stat-number" style="color: var(--accent-green);">100%</div>
+              <div class="stat-label">Serverless & Reproducible (IaC)</div>
+            </div>
+          </div>
+
+          <div style="font-size: 18px; color: #cbd5e1; margin-bottom: 16px;">
+            Explore the full codebase, tests, and Terraform modules:
+          </div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px;">
+            👉 <a href="https://github.com/hqvz28/football-analytics-aws" target="_blank" style="color: var(--accent-cyan);">github.com/hqvz28/football-analytics-aws</a>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="nav-hint">
+    Use [SPACE] or [Arrow Keys] to Navigate · Press [F] for Fullscreen
+  </div>
+
+  <!-- Reveal.js & Plugins JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      transition: 'slide',
+      backgroundTransition: 'fade',
+      plugins: [ RevealHighlight ]
+    });
+  </script>
+</body>
+</html>

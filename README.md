@@ -16,8 +16,8 @@ An enterprise-grade cloud Data Engineering lakehouse architecture on AWS featuri
 ## 📑 Project Presentation
 
 > 🎯 **Executive Presentation & Architectural Walkthrough**:  
-> Explore the full project deck, design trade-offs, and analytics visualizations on Canva:  
-> 👉 **[View Project Presentation Slide](https://canva.link/6pz4tgpmeqcc508)**
+> Explore the full project deck, design trade-offs, and analytics visualizations:  
+> 👉 **[Open Interactive Web Slide Deck (Reveal.js)](presentation/index.html)** | **[View Canva Deck](https://canva.link/6pz4tgpmeqcc508)**
 
 ---
 
