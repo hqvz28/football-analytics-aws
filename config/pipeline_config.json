@@ -1,0 +1,46 @@
+{
+  "pipeline_name": "football-analytics-aws",
+  "version": "1.0.0",
+  "aws": {
+    "region": "us-east-1",
+    "environment": "production"
+  },
+  "storage": {
+    "s3_buckets": {
+      "raw": "s3://football-analytics-lake-raw",
+      "staging": "s3://football-analytics-lake-staging",
+      "processed": "s3://football-analytics-lake-processed"
+    },
+    "s3_prefixes": {
+      "raw_matches": "matches/raw/",
+      "staging_cleaned": "matches/staging/",
+      "processed_parquet": "matches/processed/match_stats/"
+    }
+  },
+  "glue": {
+    "job_name": "glue-transform-football-match-stats",
+    "glue_version": "4.0",
+    "worker_type": "G.1X",
+    "number_of_workers": 4,
+    "catalog_database": "football_analytics_db",
+    "table_name": "match_stats"
+  },
+  "athena": {
+    "database_name": "football_analytics_db",
+    "workgroup": "primary",
+    "query_output_location": "s3://football-analytics-lake-processed/athena-query-results/"
+  },
+  "data_sources": {
+    "api_provider": "football-data.org",
+    "base_url": "https://api.football-data.org/v4",
+    "rate_limit_per_minute": 10,
+    "target_leagues": [
+      { "id": "PL", "name": "Premier League", "country": "England" },
+      { "id": "PD", "name": "La Liga", "country": "Spain" },
+      { "id": "SA", "name": "Serie A", "country": "Italy" },
+      { "id": "BL1", "name": "Bundesliga", "country": "Germany" },
+      { "id": "CL", "name": "UEFA Champions League", "country": "Europe" }
+    ],
+    "seasons": ["2022", "2023", "2024"]
+  }
+}
