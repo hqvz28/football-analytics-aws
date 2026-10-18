@@ -17,7 +17,7 @@ An enterprise-grade cloud Data Engineering lakehouse architecture on AWS featuri
 
 > 🎯 **Executive Presentation & Architectural Walkthrough**:  
 > Explore the full project deck, design trade-offs, and analytics visualizations:  
-> 👉 **[Open Interactive Web Slide Deck (Reveal.js)](presentation/index.html)** | **[View Canva Deck](https://canva.link/6pz4tgpmeqcc508)**
+> 👉 **[Open Interactive Web Slide Deck (Reveal.js)](presentation/index.html)** *(Hosted live at [hqvz28.github.io/football-presentation](https://hqvz28.github.io/football-presentation/))*
 
 ---
 
@@ -220,4 +220,4 @@ The GitHub Actions workflow in [`.github/workflows/ci-cd.yml`](file:///Users/hoa
 - **Portfolio**: [https://hqvz28.github.io](https://hqvz28.github.io)
 - **LinkedIn**: [https://www.linkedin.com/in/qviet28/](https://www.linkedin.com/in/qviet28/)
 - **GitHub**: [@hqvz28](https://github.com/hqvz28)
-- **Project Presentation**: [Canva Presentation Deck](https://canva.link/6pz4tgpmeqcc508)
+- **Interactive Slides**: [Web Presentation Deck](https://hqvz28.github.io/football-presentation/)
